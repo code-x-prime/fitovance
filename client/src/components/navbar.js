@@ -389,14 +389,30 @@ export function Navbar() {
 
           {/* Mobile Header */}
           <div className="flex lg:hidden items-center h-14 px-3 gap-2">
-            <button onClick={() => setIsMenuOpen(true)} className="p-2 text-gray-700" aria-label="Open menu">
+            <button
+              onClick={() => setIsMenuOpen(true)}
+              className={cn("p-2 transition-colors", isTransparent ? "text-white" : "text-gray-700")}
+              aria-label="Open menu"
+            >
               <Menu className="h-6 w-6" />
             </button>
             <Link href="/" className="flex-1 flex justify-center items-center h-8">
-              <Image src="/logo-2.png" alt="FITOVANCE" width={100} height={32} className="h-8 w-auto object-contain" />
+              <Image
+                src="/logo-2.png"
+                alt="FITOVANCE"
+                width={100}
+                height={32}
+                className={cn(
+                  "h-8 w-auto object-contain transition-all duration-300",
+                  isTransparent ? "brightness-0 invert" : ""
+                )}
+              />
             </Link>
             <ClientOnly>
-              <Link href="/cart" className="p-2 relative text-gray-700">
+              <Link
+                href="/cart"
+                className={cn("p-2 relative transition-colors", isTransparent ? "text-white" : "text-gray-700")}
+              >
                 <ShoppingBag className="h-5 w-5" />
                 {getCartItemCount() > 0 && (
                   <span className="absolute top-0 right-0 bg-red-500 text-white text-[8px] w-3.5 h-3.5 rounded-full flex items-center justify-center font-bold">
@@ -409,16 +425,34 @@ export function Navbar() {
         </div>
 
         {/* MOBILE SEARCH */}
-        <div className="lg:hidden px-3 py-2 border-b border-gray-100">
-          <form onSubmit={handleSearch} className="flex items-center bg-gray-100 rounded-lg overflow-hidden">
+        <div
+          className={cn(
+            "lg:hidden px-3 py-2 border-b transition-all duration-300",
+            isTransparent ? "border-white/10" : "border-gray-100"
+          )}
+        >
+          <form
+            onSubmit={handleSearch}
+            className="flex items-center rounded-lg overflow-hidden transition-all duration-300"
+            style={{
+              backgroundColor: isTransparent ? "rgba(255,255,255,0.1)" : "#f3f4f6",
+            }}
+          >
             <input
               type="text"
               placeholder="Search supplements..."
-              className="flex-1 px-4 py-2 text-sm outline-none bg-transparent text-gray-700 placeholder:text-gray-400"
+              className="flex-1 px-4 py-2 text-sm outline-none bg-transparent placeholder:text-gray-400"
+              style={{
+                color: isTransparent ? "white" : "#374151",
+              }}
               value={searchQuery}
               onChange={(e) => { setSearchQuery(e.target.value); setShowSearchDropdown(true); }}
             />
-            <button type="submit" className="px-3 py-2 text-gray-400">
+            <button
+              type="submit"
+              className="px-3 py-2 transition-colors"
+              style={{ color: isTransparent ? "rgba(255,255,255,0.5)" : "#9ca3af" }}
+            >
               <Search className="h-4 w-4" />
             </button>
           </form>
@@ -672,7 +706,13 @@ export function Navbar() {
         >
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 bg-black text-white shrink-0">
-            <Image src="/logo.jpeg" alt="FITOVANCE" width={100} height={36} className="h-8 w-auto object-contain" />
+            <Image
+              src="/logo-2.png"
+              alt="FITOVANCE"
+              width={100}
+              height={36}
+              className="h-8 w-auto object-contain brightness-0 invert"
+            />
             <button onClick={() => setIsMenuOpen(false)} className="p-1">
               <X className="h-5 w-5" />
             </button>
