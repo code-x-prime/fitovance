@@ -1,15 +1,13 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { X, Play, Volume2, VolumeX, ChevronLeft, ChevronRight, ShoppingCart, } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { X, Play, ChevronLeft, ChevronRight, ShoppingCart, } from "lucide-react";
+
 import Link from "next/link";
 
 export default function ReelModal({ reel, onClose, onNext, onPrev, hasNext }) {
-  const router = useRouter();
   const videoRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [isMuted, setIsMuted] = useState(true);
   const [progress, setProgress] = useState(0);
   const [showShareMenu, setShowShareMenu] = useState(false);
   const touchStart = useRef(null);
@@ -83,12 +81,6 @@ export default function ReelModal({ reel, onClose, onNext, onPrev, hasNext }) {
     }
   }, []);
 
-  const toggleMute = useCallback(() => {
-    const vid = videoRef.current;
-    if (!vid) return;
-    vid.muted = !vid.muted;
-    setIsMuted(vid.muted);
-  }, []);
 
   // Progress tracking
   useEffect(() => {
@@ -105,7 +97,7 @@ export default function ReelModal({ reel, onClose, onNext, onPrev, hasNext }) {
 
 
 
-  const productUrl = reel?.product?.slug 
+  const productUrl = reel?.product?.slug
     ? `/products/${reel.product.slug}${reel.variant?.id ? `?variant=${reel.variant.id}` : ""}`
     : "#";
 
@@ -173,13 +165,7 @@ export default function ReelModal({ reel, onClose, onNext, onPrev, hasNext }) {
           </div>
         )}
 
-        {/* Mute toggle */}
-        <button
-          onClick={(e) => { e.stopPropagation(); toggleMute(); }}
-          className="absolute top-4 left-4 z-50 w-9 h-9 rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center text-white hover:bg-black/50 transition-colors"
-        >
-          {isMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
-        </button>
+
 
         {/* Progress bar */}
         <div className="absolute top-0 left-0 right-0 h-0.5 bg-white/20 z-20">
@@ -193,7 +179,7 @@ export default function ReelModal({ reel, onClose, onNext, onPrev, hasNext }) {
         {/* Bottom product card */}
         <div className="absolute bottom-0 left-0 right-0 z-20 p-4">
           {reel.product?.slug ? (
-            <Link 
+            <Link
               href={productUrl}
               onClick={onClose}
               className="bg-white p-3 flex items-center gap-3 shadow-2xl cursor-pointer hover:bg-gray-50 transition-colors rounded-lg flex w-full"
