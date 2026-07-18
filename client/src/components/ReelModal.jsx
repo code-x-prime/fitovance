@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { X, Play, Volume2, VolumeX, ChevronLeft, ChevronRight, ShoppingCart, } from "lucide-react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 export default function ReelModal({ reel, onClose, onNext, onPrev, hasNext }) {
   const router = useRouter();
@@ -104,13 +105,9 @@ export default function ReelModal({ reel, onClose, onNext, onPrev, hasNext }) {
 
 
 
-  const buyNow = () => {
-    if (!reel?.product?.slug) return;
-    let url = `/products/${reel.product.slug}`;
-    if (reel.variant?.id) url += `?variant=${reel.variant.id}`;
-    router.push(url);
-    onClose();
-  };
+  const productUrl = reel?.product?.slug 
+    ? `/products/${reel.product.slug}${reel.variant?.id ? `?variant=${reel.variant.id}` : ""}`
+    : "#";
 
   if (!reel) return null;
 
@@ -195,49 +192,54 @@ export default function ReelModal({ reel, onClose, onNext, onPrev, hasNext }) {
 
         {/* Bottom product card */}
         <div className="absolute bottom-0 left-0 right-0 z-20 p-4">
-          <div className="bg-white  p-3 flex items-center gap-3 shadow-2xl">
-            {reel.product?.imageUrl && (
-              <img
-                src={reel.product.imageUrl}
-                alt={reel.product.name}
-                className="w-14 h-14 rounded-lg object-cover border flex-shrink-0"
-              />
-            )}
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-gray-900 line-clamp-1">
-                {reel.product?.name}
-              </p>
-              <div className="flex items-center gap-2 mt-0.5">
-                {reel.product?.price != null && (
-                  <span className="text-base font-bold text-gray-900">
-                    ₹{reel.product.price}
-                  </span>
-                )}
-                {reel.product?.originalPrice != null && reel.product.originalPrice > reel.product.price && (
-                  <span className="text-xs text-gray-400 line-through">
-                    ₹{reel.product.originalPrice}
-                  </span>
-                )}
-                {reel.product?.hasSale && (
-                  <span className="text-[10px] font-semibold text-green-600 bg-green-50 px-1.5 py-0.5 rounded">
-                    {Math.round(((reel.product.originalPrice - reel.product.price) / reel.product.originalPrice) * 100)}% OFF
-                  </span>
+          {reel.product?.slug ? (
+            <Link 
+              href={productUrl}
+              onClick={onClose}
+              className="bg-white p-3 flex items-center gap-3 shadow-2xl cursor-pointer hover:bg-gray-50 transition-colors rounded-lg flex w-full"
+            >
+              {reel.product?.imageUrl && (
+                <img
+                  src={reel.product.imageUrl}
+                  alt={reel.product.name}
+                  className="w-14 h-14 rounded-lg object-cover border flex-shrink-0"
+                />
+              )}
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-gray-900 line-clamp-1">
+                  {reel.product?.name}
+                </p>
+                <div className="flex items-center gap-2 mt-0.5">
+                  {reel.product?.price != null && (
+                    <span className="text-base font-bold text-gray-900">
+                      ₹{reel.product.price}
+                    </span>
+                  )}
+                  {reel.product?.originalPrice != null && reel.product.originalPrice > reel.product.price && (
+                    <span className="text-xs text-gray-400 line-through">
+                      ₹{reel.product.originalPrice}
+                    </span>
+                  )}
+                  {reel.product?.hasSale && (
+                    <span className="text-[10px] font-semibold text-green-600 bg-green-50 px-1.5 py-0.5 rounded">
+                      {Math.round(((reel.product.originalPrice - reel.product.price) / reel.product.originalPrice) * 100)}% OFF
+                    </span>
+                  )}
+                </div>
+                {reel.variant && (
+                  <p className="text-[11px] text-gray-500 mt-0.5">
+                    {reel.variant.attributes?.map(a => a.value).filter(Boolean).join(" / ")}
+                  </p>
                 )}
               </div>
-              {reel.variant && (
-                <p className="text-[11px] text-gray-500 mt-0.5">
-                  {reel.variant.attributes?.map(a => a.value).filter(Boolean).join(" / ")}
-                </p>
-              )}
-            </div>
-            <button
-              onClick={(e) => { e.stopPropagation(); buyNow(); }}
-              className="flex-shrink-0 h-10 px-4 rounded-lg bg-gray-900 text-white text-xs font-semibold flex items-center gap-1.5 hover:bg-gray-800 transition-colors"
-            >
-              <ShoppingCart className="h-3.5 w-3.5" />
-              Buy Now
-            </button>
-          </div>
+              <span
+                className="flex-shrink-0 h-10 px-4 rounded-lg bg-gray-900 text-white text-xs font-semibold flex items-center gap-1.5 hover:bg-gray-800 transition-colors"
+              >
+                <ShoppingCart className="h-3.5 w-3.5" />
+                Buy Now
+              </span>
+            </Link>
+          ) : null}
 
           {hasNext && (
             <p className="text-center text-white/50 text-[11px] mt-3">
