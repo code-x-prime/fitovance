@@ -13,7 +13,7 @@ const SupplementStoreUI = () => {
         >
           {/* Mobile image */}
           <img
-            src="/collection-Banner.png"
+            src="/collection-banner.png"
             alt="Collection Banner"
             className="block md:hidden w-full object-cover aspect-[9/14]"
           />
