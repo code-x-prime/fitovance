@@ -39,6 +39,11 @@ import {
   ResponsiveContainer,
   Legend,
   Tooltip,
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
 } from "recharts";
 
 // Helper function to get proper image URL
@@ -101,6 +106,7 @@ export default function DashboardPage() {
   const [returnStats, setReturnStats] = useState<ReturnStats | null>(null);
   const [recentReturns, setRecentReturns] = useState<any[]>([]);
   const [userStats, setUserStats] = useState<UserStats | null>(null);
+  const [recentOrders, setRecentOrders] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -226,6 +232,31 @@ export default function DashboardPage() {
         } catch (err) {
           console.error("Error fetching user stats:", err);
         }
+
+        // Load recent orders
+        try {
+          const recentOrdersData = await orders.getOrders({
+            page: 1,
+            limit: 5,
+          });
+          let actualOrders: any[] = [];
+          if (
+            recentOrdersData?.data?.success &&
+            recentOrdersData?.data?.data?.orders
+          ) {
+            actualOrders = recentOrdersData.data.data.orders;
+          } else if (
+            recentOrdersData?.data?.statusCode === 200 &&
+            recentOrdersData?.data?.data?.orders
+          ) {
+            actualOrders = recentOrdersData.data.data.orders;
+          } else if (recentOrdersData?.data?.orders) {
+            actualOrders = recentOrdersData.data.orders;
+          }
+          setRecentOrders(actualOrders);
+        } catch (err) {
+          console.error("Error fetching recent orders:", err);
+        }
       } catch (error: any) {
         console.error("Error fetching dashboard data:", error);
         setError("Failed to load dashboard data. Please try again.");
@@ -336,10 +367,10 @@ export default function DashboardPage() {
 
             <Button
               variant="outline"
-              className="h-auto p-4 border-border hover:bg-muted text-left"
+              className="h-auto p-4 border-border hover:bg-muted justify-start w-full text-left"
               asChild
             >
-              <Link to="/banners" className="flex items-center gap-3">
+              <Link to="/banners" className="flex items-center gap-3 w-full">
                 <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-primary/10">
                   <ImageIcon className="h-5 w-5 text-primary" />
                 </div>
@@ -352,10 +383,10 @@ export default function DashboardPage() {
 
             <Button
               variant="outline"
-              className="h-auto p-4 border-border hover:bg-muted text-left"
+              className="h-auto p-4 border-border hover:bg-muted justify-start w-full text-left"
               asChild
             >
-              <Link to="/dashboard/analytics" className="flex items-center gap-3">
+              <Link to="/dashboard/analytics" className="flex items-center gap-3 w-full">
                 <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-primary/10">
                   <BarChart3 className="h-5 w-5 text-primary" />
                 </div>
@@ -555,178 +586,202 @@ export default function DashboardPage() {
             </div>
           </CardContent>
         </Card>
+      </div>      {/* Charts Section: Monthly Revenue & Order Distribution */}
+      <div className="grid gap-6 lg:grid-cols-3">
+        {/* Monthly Revenue Trend */}
+        <Card className="lg:col-span-2 bg-card border-border shadow-[0_1px_2px_rgba(0,0,0,0.04)] rounded-xl">
+          <CardHeader className="px-6 pt-6 pb-4">
+            <CardTitle className="text-lg font-semibold text-foreground flex items-center gap-2">
+              <BarChart3 className="h-5 w-5 text-primary" />
+              Monthly Revenue Trend
+            </CardTitle>
+            <p className="text-sm text-muted-foreground mt-1">
+              Overview of store performance and monthly sales history.
+            </p>
+          </CardHeader>
+          <CardContent className="px-6 pb-6">
+            {orderStats?.monthlySales && orderStats.monthlySales.length > 0 ? (
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={orderStats.monthlySales} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#E53E3E" stopOpacity={0.2}/>
+                        <stop offset="95%" stopColor="#E53E3E" stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
+                    <XAxis dataKey="month" tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: '#6B7280' }} />
+                    <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: '#6B7280' }} />
+                    <Tooltip 
+                      contentStyle={{ backgroundColor: '#FFFFFF', borderColor: '#E5E7EB', borderRadius: '8px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}
+                      formatter={(value: any) => [`₹${parseFloat(value).toLocaleString("en-IN")}`, "Revenue"]}
+                    />
+                    <Area type="monotone" dataKey="revenue" stroke="#E53E3E" strokeWidth={2} fillOpacity={1} fill="url(#colorRevenue)" />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            ) : (
+              <div className="flex h-64 items-center justify-center text-muted-foreground text-sm">
+                No monthly sales history available
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Order Status Distribution */}
+        <Card className="bg-card border-border shadow-[0_1px_2px_rgba(0,0,0,0.04)] rounded-xl">
+          <CardHeader className="px-6 pt-6 pb-4">
+            <CardTitle className="text-lg font-semibold text-foreground flex items-center gap-2">
+              <PieChartIcon className="h-5 w-5 text-primary" />
+              {t("dashboard.order_stats.title")}
+            </CardTitle>
+            <p className="text-sm text-muted-foreground mt-1">
+              {t("dashboard.order_stats.subtitle")}
+            </p>
+          </CardHeader>
+          <CardContent className="px-6 pb-6">
+            {orderStats?.statusCounts && Object.keys(orderStats.statusCounts).length > 0 ? (
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={Object.entries(orderStats.statusCounts).map(
+                        ([status, count]) => ({
+                          name: status,
+                          value: count as number,
+                        })
+                      )}
+                      cx="50%"
+                      cy="48%"
+                      labelLine={false}
+                      outerRadius={70}
+                      fill="#8884d8"
+                      dataKey="value"
+                      nameKey="name"
+                      label={({ name, percent }) =>
+                        `${name}: ${(percent * 100).toFixed(0)}%`
+                      }
+                    >
+                      {Object.entries(orderStats.statusCounts).map(
+                        ([_], index) => {
+                          const COLORS = [
+                            "#F59E0B", // PENDING - warning
+                            "#3B82F6", // PROCESSING - blue
+                            "#22C55E", // PAID - success
+                            "#6366F1", // SHIPPED - indigo
+                            "#4CAF50", // DELIVERED - primary
+                            "#EF4444", // CANCELLED - danger
+                            "#A855F7", // REFUNDED - purple
+                            "#9CA3AF", // default - muted
+                          ];
+                          return (
+                            <Cell
+                              key={`cell-${index}`}
+                              fill={COLORS[index % COLORS.length]}
+                            />
+                          );
+                        }
+                      )}
+                    </Pie>
+                    <Tooltip />
+                    <Legend wrapperStyle={{ fontSize: '11px', marginTop: '10px' }} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            ) : (
+              <div className="flex h-64 items-center justify-center text-muted-foreground text-sm">
+                No orders statistics available
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
-      {/* Main Content Section */}
+      {/* Main Operational Section */}
       <div className="grid gap-6 lg:grid-cols-2">
-        {/* Left Column - Top Products / Sales Activity */}
+        {/* Left Column: Recent Orders & Returns */}
         <div className="space-y-6">
-          {orderStats?.topProducts && orderStats.topProducts.length > 0 ? (
-            <Card className="bg-card border-border shadow-[0_1px_2px_rgba(0,0,0,0.04)] rounded-xl">
-              <CardHeader className="px-6 pt-6 pb-4">
-                <CardTitle className="text-lg font-semibold text-foreground">
-                  {t("dashboard.top_selling.title")}
-                </CardTitle>
-                <p className="text-sm text-muted-foreground mt-1">
-                  {t("dashboard.top_selling.subtitle")}
-                </p>
-              </CardHeader>
-              <CardContent className="px-6 pb-6">
-                <div className="space-y-4">
-                  {orderStats.topProducts.slice(0, 5).map((product: any) => (
-                    <div
-                      key={product.id}
-                      className="flex items-center gap-4 pb-4 border-b border-border last:border-0 last:pb-0"
-                    >
-                      <div
-                        className="h-14 w-14 rounded-lg bg-muted border border-border flex-shrink-0"
-                        style={{
-                          backgroundImage:
-                            product.images && product.images[0]
-                              ? `url(${getImageUrl(
-                                product.images[0].url || product.images[0]
-                              )})`
-                              : "none",
-                          backgroundSize: "cover",
-                          backgroundPosition: "center",
-                        }}
-                      />
-                      <div className="flex-1 min-w-0">
-                        <h4 className="font-semibold text-foreground text-sm truncate">
-                          {product.name}
-                        </h4>
-                        <div className="flex items-center gap-4 mt-1.5 text-xs text-muted-foreground">
-                          <span>
-                            <span className="font-semibold text-foreground">
-                              {product.quantitySold || 0}
-                            </span>{" "}
-                            {t("dashboard.top_selling.sold")}
-                          </span>
-                          <span>
-                            <span className="font-semibold text-foreground">
-                              ₹
-                              {typeof product.revenue === "string"
-                                ? product.revenue
-                                : parseFloat(
-                                  product.revenue || 0
-                                ).toLocaleString()}
-                            </span>{" "}
-                            {t("dashboard.top_selling.revenue")}
-                          </span>
-                        </div>
-                      </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="text-xs h-8 border-border hover:bg-muted"
-                        asChild
-                      >
-                        <Link to={`/products/${product.id}`}>{t("dashboard.top_selling.view")}</Link>
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          ) : (
-            <Card className="bg-card border-border shadow-[0_1px_2px_rgba(0,0,0,0.04)] rounded-xl">
-              <CardContent className="p-12">
-                <div className="text-center">
-                  <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-muted mb-4">
-                    <BarChart3 className="h-8 w-8 text-muted-foreground" />
-                  </div>
-                  <h3 className="text-lg font-semibold text-foreground mb-1.5">
-                    {t("dashboard.top_selling.no_data")}
-                  </h3>
-                  <p className="text-sm text-muted-foreground mb-6 max-w-sm mx-auto">
-                    {t("dashboard.top_selling.no_data_desc")}
+          {/* Recent Orders Table */}
+          <Card className="bg-card border-border shadow-[0_1px_2px_rgba(0,0,0,0.04)] rounded-xl">
+            <CardHeader className="px-6 pt-6 pb-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-lg font-semibold text-foreground flex items-center gap-2">
+                    <ShoppingCart className="h-5 w-5 text-primary" />
+                    Recent Orders
+                  </CardTitle>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Latest orders placed on your store.
                   </p>
-                  <Button
-                    variant="outline"
-                    className="border-primary text-primary hover:bg-accent"
-                    asChild
-                  >
-                    <Link to="/products">{t("dashboard.top_selling.view_products")}</Link>
-                  </Button>
                 </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Low Stock Items */}
-          {inventoryAlerts && inventoryAlerts.count > 0 && (
-            <Card className="bg-card border-border shadow-[0_1px_2px_rgba(0,0,0,0.04)] rounded-xl">
-              <CardHeader className="px-6 pt-6 pb-4">
-                <CardTitle className="text-lg font-semibold text-foreground flex items-center gap-2">
-                  <Package2 className="h-5 w-5 text-primary" />
-                  {t("dashboard.low_stock.title")}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="px-6 pb-6">
-                <div className="space-y-3 max-h-64 overflow-y-auto">
-                  {inventoryAlerts.alerts.slice(0, 5).map((alert: any) => (
-                    <div
-                      key={alert.id}
-                      className="flex items-center gap-3 pb-3 border-b border-border last:border-0 last:pb-0"
-                    >
-                      <div
-                        className="h-12 w-12 rounded-lg bg-muted border border-border flex-shrink-0"
-                        style={{
-                          backgroundImage: alert.image
-                            ? `url(${getImageUrl(alert.image)})`
-                            : "none",
-                          backgroundSize: "cover",
-                          backgroundPosition: "center",
-                        }}
-                      />
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center justify-between mb-1">
-                          <p className="font-semibold text-sm text-foreground truncate">
-                            {alert.productName}
-                          </p>
-                          <Badge
-                            variant="outline"
-                            className={
-                              alert.status === "OUT_OF_STOCK"
-                                ? "bg-destructive/10 text-destructive border-destructive/30 text-xs"
-                                : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30 text-xs"
-                            }
-                          >
-                            {alert.status === "OUT_OF_STOCK"
-                              ? t("dashboard.low_stock.out_of_stock")
-                              : t("dashboard.low_stock.left", { count: alert.stock })}
-                          </Badge>
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          {[alert.flavor, alert.weight]
-                            .filter(Boolean)
-                            .join(" • ")}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+                <Button variant="outline" size="sm" className="border-border hover:bg-muted text-xs" asChild>
+                  <Link to="/orders">
+                    View All
+                    <ArrowUpRight className="ml-1 h-3.5 w-3.5" />
+                  </Link>
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="px-6 pb-6">
+              {recentOrders && recentOrders.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm text-left border-collapse">
+                    <thead>
+                      <tr className="border-b border-border text-muted-foreground font-semibold text-xs uppercase tracking-wider">
+                        <th className="pb-3 pr-4 text-left">Order Number</th>
+                        <th className="pb-3 px-4 text-left">Customer</th>
+                        <th className="pb-3 px-4 text-left">Date</th>
+                        <th className="pb-3 px-4 text-left">Status</th>
+                        <th className="pb-3 pl-4 text-right">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {recentOrders.map((order) => (
+                        <tr key={order.id} className="hover:bg-muted/30 transition-colors">
+                          <td className="py-3.5 pr-4 font-semibold text-primary">
+                            <Link to={`/orders/${order.id}`} className="hover:underline">
+                              {order.orderNumber || `#${order.id.slice(-6)}`}
+                            </Link>
+                          </td>
+                          <td className="py-3.5 px-4">
+                            <div className="font-semibold text-foreground max-w-[120px] truncate">{order.user?.name || "Guest User"}</div>
+                            <div className="text-xs text-muted-foreground max-w-[120px] truncate">{order.user?.email || ""}</div>
+                          </td>
+                          <td className="py-3.5 px-4 text-muted-foreground text-xs">
+                            {new Date(order.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                          </td>
+                          <td className="py-3.5 px-4">
+                            <Badge
+                              variant="outline"
+                              className={
+                                order.status === "PAID" || order.status === "DELIVERED"
+                                  ? "bg-green-500/10 text-green-600 border-green-500/30 text-xs px-2 py-0.5"
+                                  : order.status === "PENDING"
+                                  ? "bg-amber-500/10 text-amber-600 border-amber-500/30 text-xs px-2 py-0.5"
+                                  : "bg-blue-500/10 text-blue-600 border-blue-500/30 text-xs px-2 py-0.5"
+                              }
+                            >
+                              {order.status}
+                            </Badge>
+                          </td>
+                          <td className="py-3.5 pl-4 text-right font-bold text-foreground">
+                            ₹{parseFloat(order.totalAmount || 0).toLocaleString("en-IN")}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
-                {inventoryAlerts.count > 5 && (
-                  <div className="mt-4 text-center">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-sm text-muted-foreground hover:text-foreground"
-                      asChild
-                    >
-                      <Link to="/products">
-                        {t("dashboard.low_stock.view_all", { count: inventoryAlerts.count })}
-                      </Link>
-                    </Button>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          )}
-        </div>
+              ) : (
+                <div className="text-center py-8 text-muted-foreground text-sm">
+                  No orders found
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
-        {/* Right Column - Recent Returns / Orders */}
-        <div className="space-y-6">
+          {/* Recent Return Requests */}
           {recentReturns.length > 0 ? (
             <Card className="bg-card border-border shadow-[0_1px_2px_rgba(0,0,0,0.04)] rounded-xl">
               <CardHeader className="px-6 pt-6 pb-4">
@@ -889,71 +944,174 @@ export default function DashboardPage() {
               </CardContent>
             </Card>
           )}
+        </div>
 
-          {/* Order Status Distribution - Hidden on mobile */}
-          {orderStats?.statusCounts &&
-            Object.keys(orderStats.statusCounts).length > 0 && (
-              <Card className="bg-card border-border shadow-[0_1px_2px_rgba(0,0,0,0.04)] rounded-xl hidden lg:block">
-                <CardHeader className="px-6 pt-6 pb-4">
-                  <CardTitle className="text-lg font-semibold text-foreground flex items-center gap-2">
-                    <PieChartIcon className="h-5 w-5 text-primary" />
-                    {t("dashboard.order_stats.title")}
-                  </CardTitle>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    {t("dashboard.order_stats.subtitle")}
-                  </p>
-                </CardHeader>
-                <CardContent className="px-6 pb-6">
-                  <div className="h-64">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={Object.entries(orderStats.statusCounts).map(
-                            ([status, count]) => ({
-                              name: status,
-                              value: count as number,
-                            })
-                          )}
-                          cx="50%"
-                          cy="50%"
-                          labelLine={false}
-                          outerRadius={80}
-                          fill="#8884d8"
-                          dataKey="value"
-                          nameKey="name"
-                          label={({ name, percent }) =>
-                            `${name}: ${(percent * 100).toFixed(0)}%`
-                          }
-                        >
-                          {Object.entries(orderStats.statusCounts).map(
-                            ([_], index) => {
-                              const COLORS = [
-                                "#F59E0B", // PENDING - warning
-                                "#3B82F6", // PROCESSING - blue
-                                "#22C55E", // PAID - success
-                                "#6366F1", // SHIPPED - indigo
-                                "#4CAF50", // DELIVERED - primary
-                                "#EF4444", // CANCELLED - danger
-                                "#A855F7", // REFUNDED - purple
-                                "#9CA3AF", // default - muted
-                              ];
-                              return (
-                                <Cell
-                                  key={`cell-${index}`}
-                                  fill={COLORS[index % COLORS.length]}
-                                />
-                              );
-                            }
-                          )}
-                        </Pie>
-                        <Tooltip />
-                        <Legend />
-                      </PieChart>
-                    </ResponsiveContainer>
+        {/* Right Column: Top Products & Low Stock Items */}
+        <div className="space-y-6">
+          {/* Top Selling Products */}
+          {orderStats?.topProducts && orderStats.topProducts.length > 0 ? (
+            <Card className="bg-card border-border shadow-[0_1px_2px_rgba(0,0,0,0.04)] rounded-xl">
+              <CardHeader className="px-6 pt-6 pb-4">
+                <CardTitle className="text-lg font-semibold text-foreground flex items-center gap-2">
+                  <BarChart3 className="h-5 w-5 text-primary" />
+                  {t("dashboard.top_selling.title")}
+                </CardTitle>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {t("dashboard.top_selling.subtitle")}
+                </p>
+              </CardHeader>
+              <CardContent className="px-6 pb-6">
+                <div className="space-y-4">
+                  {orderStats.topProducts.slice(0, 5).map((product: any) => (
+                    <div
+                      key={product.id}
+                      className="flex items-center gap-4 pb-4 border-b border-border last:border-0 last:pb-0"
+                    >
+                      <div
+                        className="h-14 w-14 rounded-lg bg-muted border border-border flex-shrink-0"
+                        style={{
+                          backgroundImage:
+                            product.images && product.images[0]
+                              ? `url(${getImageUrl(
+                                product.images[0].url || product.images[0]
+                              )})`
+                              : "none",
+                          backgroundSize: "cover",
+                          backgroundPosition: "center",
+                        }}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-semibold text-foreground text-sm truncate">
+                          {product.name}
+                        </h4>
+                        <div className="flex items-center gap-4 mt-1.5 text-xs text-muted-foreground">
+                          <span>
+                            <span className="font-semibold text-foreground">
+                              {product.quantitySold || 0}
+                            </span>{" "}
+                            {t("dashboard.top_selling.sold")}
+                          </span>
+                          <span>
+                            <span className="font-semibold text-foreground">
+                              ₹
+                              {typeof product.revenue === "string"
+                                ? product.revenue
+                                : parseFloat(
+                                  product.revenue || 0
+                                ).toLocaleString()}
+                            </span>{" "}
+                            {t("dashboard.top_selling.revenue")}
+                          </span>
+                        </div>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-xs h-8 border-border hover:bg-muted"
+                        asChild
+                      >
+                        <Link to={`/products/${product.id}`}>{t("dashboard.top_selling.view")}</Link>
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card className="bg-card border-border shadow-[0_1px_2px_rgba(0,0,0,0.04)] rounded-xl">
+              <CardContent className="p-12">
+                <div className="text-center">
+                  <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-muted mb-4">
+                    <BarChart3 className="h-8 w-8 text-muted-foreground" />
                   </div>
-                </CardContent>
-              </Card>
-            )}
+                  <h3 className="text-lg font-semibold text-foreground mb-1.5">
+                    {t("dashboard.top_selling.no_data")}
+                  </h3>
+                  <p className="text-sm text-muted-foreground mb-6 max-w-sm mx-auto">
+                    {t("dashboard.top_selling.no_data_desc")}
+                  </p>
+                  <Button
+                    variant="outline"
+                    className="border-primary text-primary hover:bg-accent"
+                    asChild
+                  >
+                    <Link to="/products">{t("dashboard.top_selling.view_products")}</Link>
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Low Stock Items */}
+          {inventoryAlerts && inventoryAlerts.count > 0 && (
+            <Card className="bg-card border-border shadow-[0_1px_2px_rgba(0,0,0,0.04)] rounded-xl">
+              <CardHeader className="px-6 pt-6 pb-4">
+                <CardTitle className="text-lg font-semibold text-foreground flex items-center gap-2">
+                  <Package2 className="h-5 w-5 text-primary" />
+                  {t("dashboard.low_stock.title")}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="px-6 pb-6">
+                <div className="space-y-3 max-h-64 overflow-y-auto">
+                  {inventoryAlerts.alerts.slice(0, 5).map((alert: any) => (
+                    <div
+                      key={alert.id}
+                      className="flex items-center gap-3 pb-3 border-b border-border last:border-0 last:pb-0"
+                    >
+                      <div
+                        className="h-12 w-12 rounded-lg bg-muted border border-border flex-shrink-0"
+                        style={{
+                          backgroundImage: alert.image
+                            ? `url(${getImageUrl(alert.image)})`
+                            : "none",
+                          backgroundSize: "cover",
+                          backgroundPosition: "center",
+                        }}
+                      />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between mb-1">
+                          <p className="font-semibold text-sm text-foreground truncate">
+                            {alert.productName}
+                          </p>
+                          <Badge
+                            variant="outline"
+                            className={
+                              alert.status === "OUT_OF_STOCK"
+                                ? "bg-destructive/10 text-destructive border-destructive/30 text-xs"
+                                : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30 text-xs"
+                            }
+                          >
+                            {alert.status === "OUT_OF_STOCK"
+                              ? t("dashboard.low_stock.out_of_stock")
+                              : t("dashboard.low_stock.left", { count: alert.stock })}
+                          </Badge>
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {[alert.flavor, alert.weight]
+                            .filter(Boolean)
+                            .join(" • ")}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {inventoryAlerts.count > 5 && (
+                  <div className="mt-4 text-center">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-sm text-muted-foreground hover:text-foreground"
+                      asChild
+                    >
+                      <Link to="/products">
+                        {t("dashboard.low_stock.view_all", { count: inventoryAlerts.count })}
+                      </Link>
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
     </div>
