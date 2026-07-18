@@ -22,10 +22,10 @@ module.exports = {
       name: "fitovance-client",
       cwd: "./client",
       script: "node_modules/next/dist/bin/next",
-      args: "start -p 3001",
+      args: "start -p 3002",
       env: {
         NODE_ENV: "production",
-        PORT: 3001,
+        PORT: 3002,
       },
       instances: 1,
       exec_mode: "fork",
