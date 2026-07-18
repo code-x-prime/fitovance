@@ -1,0 +1,1363 @@
+"use client";
+
+import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/lib/auth-context";
+import { useCart } from "@/lib/cart-context";
+import { fetchApi, formatCurrency, loadScript } from "@/lib/utils";
+import { playSuccessSound, fireConfetti } from "@/lib/sound-utils";
+import { Button } from "@/components/ui/button";
+import {
+  CreditCard,
+  AlertCircle,
+  Loader2,
+  CheckCircle,
+  MapPin,
+  Plus,
+  IndianRupee,
+  ShoppingBag,
+  PartyPopper,
+  Gift,
+  Wallet,
+} from "lucide-react";
+import { toast } from "sonner";
+import Link from "next/link";
+import AddressForm from "@/components/AddressForm";
+import Image from "next/image";
+import AddonSvgIcon from "@/components/AddonSvgIcon";
+
+// Helper function to format image URLs correctly
+const getImageUrl = (image) => {
+  if (!image) return "/placeholder.png";
+  if (image.startsWith("http")) return image;
+  return `https://desirediv-storage.blr1.digitaloceanspaces.com/${image}`;
+};
+
+export default function CheckoutPage() {
+  const { isAuthenticated, user } = useAuth();
+  const router = useRouter();
+  const { cart, coupon, getCartTotals, clearCart, loading } = useCart();
+  const [addresses, setAddresses] = useState([]);
+  const [selectedAddressId, setSelectedAddressId] = useState("");
+  const [loadingAddresses, setLoadingAddresses] = useState(true);
+  const [paymentSettings, setPaymentSettings] = useState({
+    cashEnabled: true,
+    razorpayEnabled: false,
+    codCharge: 0,
+    paypalEnabled: false,
+    payoneerEnabled: false,
+    usdExchangeRate: 83.0,
+  });
+  const [paymentMethod, setPaymentMethod] = useState("CASH");
+  const [processing, setProcessing] = useState(false);
+  const [orderCreated, setOrderCreated] = useState(false);
+  const [orderId, setOrderId] = useState("");
+  const [paymentId, setPaymentId] = useState("");
+  const [razorpayKey, setRazorpayKey] = useState("");
+  const [paypalClientId, setPaypalClientId] = useState("");
+  const [siteName, setSiteName] = useState("");
+  const [isIndianCustomer, setIsIndianCustomer] = useState(true); // default India
+  const [geoDetected, setGeoDetected] = useState(false);
+  const [error, setError] = useState("");
+  const [showAddressForm, setShowAddressForm] = useState(false);
+  const [orderNumber, setOrderNumber] = useState("");
+  const [successAnimation, setSuccessAnimation] = useState(false);
+  const [redirectCountdown, setRedirectCountdown] = useState(2); // Reduced from 3 to 2 seconds
+  const [confettiCannon, setConfettiCannon] = useState(false);
+
+  const rawTotals = getCartTotals();
+  const totals = rawTotals;
+
+  // Redirect if not authenticated
+  useEffect(() => {
+    if (!isAuthenticated) {
+      router.push("/auth?redirect=checkout");
+    }
+  }, [isAuthenticated, router]);
+
+  // Redirect if cart is empty (but not if order is already created, and not if still loading)
+  useEffect(() => {
+    if (!loading && isAuthenticated && cart.items?.length === 0 && !orderCreated) {
+      router.push("/cart");
+    }
+  }, [isAuthenticated, cart, router, orderCreated, loading]);
+
+  // Fetch payment settings
+  useEffect(() => {
+    const fetchPaymentSettings = async () => {
+      try {
+        const response = await fetchApi("/payment/settings", {
+          credentials: "include",
+        });
+        if (response.success) {
+          setPaymentSettings({
+            cashEnabled: response.data.cashEnabled ?? true,
+            razorpayEnabled: response.data.razorpayEnabled ?? false,
+            codCharge: response.data.codCharge ?? 0,
+            paypalEnabled: response.data.paypalEnabled ?? false,
+            payoneerEnabled: response.data.payoneerEnabled ?? false,
+            usdExchangeRate: response.data.usdExchangeRate ?? 83.0,
+          });
+          // Default: Cash > Razorpay for Indian; PayPal for international (set after geo-detect)
+          if (response.data.cashEnabled) {
+            setPaymentMethod("CASH");
+          } else if (response.data.razorpayEnabled) {
+            setPaymentMethod("RAZORPAY");
+          } else if (response.data.paypalEnabled) {
+            setPaymentMethod("PAYPAL");
+          } else if (response.data.payoneerEnabled) {
+            setPaymentMethod("PAYONEER");
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching payment settings:", error);
+        // Default to cash if fetch fails
+        setPaymentMethod("CASH");
+      }
+    };
+    fetchPaymentSettings();
+  }, []);
+
+
+  // Fetch addresses
+  const fetchAddresses = useCallback(async () => {
+    if (!isAuthenticated) return;
+
+    setLoadingAddresses(true);
+    try {
+      const response = await fetchApi("/users/addresses", {
+        credentials: "include",
+      });
+
+      if (response.success) {
+        setAddresses(response.data.addresses || []);
+
+        // Set the default address if available
+        if (response.data.addresses?.length > 0) {
+          const defaultAddress = response.data.addresses.find(
+            (addr) => addr.isDefault
+          );
+          const chosenAddress = defaultAddress || response.data.addresses[0];
+          if (chosenAddress) {
+            setSelectedAddressId(chosenAddress.id);
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching addresses:", error);
+      toast.error("Failed to load your addresses");
+    } finally {
+      setLoadingAddresses(false);
+    }
+  }, [isAuthenticated]);
+
+  useEffect(() => {
+    fetchAddresses();
+  }, [fetchAddresses]);
+
+  // Fetch public settings (site name for Razorpay modal)
+  useEffect(() => {
+    const fetchPublicSettings = async () => {
+      try {
+        const res = await fetchApi("/public/settings", { credentials: "include" });
+        if (res?.success && res?.data?.siteName) {
+          setSiteName(res.data.siteName);
+        }
+      } catch (err) {
+        console.error("Error fetching public settings:", err);
+      }
+    };
+    fetchPublicSettings();
+  }, []);
+
+  // Geo-detect: Indian or International customer
+  useEffect(() => {
+    const detect = async () => {
+      try {
+        const res = await fetch("https://ipapi.co/json/");
+        const data = await res.json();
+        const india = data?.country_code === "IN";
+        setIsIndianCustomer(india);
+        setGeoDetected(true);
+        // If international, default to PayPal or Payoneer
+        if (!india) {
+          if (paymentSettings.paypalEnabled) {
+            setPaymentMethod("PAYPAL");
+          } else if (paymentSettings.payoneerEnabled) {
+            setPaymentMethod("PAYONEER");
+          }
+        }
+      } catch {
+        setIsIndianCustomer(true); // fallback to India on error
+        setGeoDetected(true);
+      }
+    };
+    detect();
+  }, [paymentSettings.paypalEnabled]);
+
+  // Fetch PayPal client ID
+  useEffect(() => {
+    const fetchPaypalId = async () => {
+      try {
+        const res = await fetchApi("/payment/paypal/client-id");
+        if (res?.success && res?.data?.clientId) {
+          setPaypalClientId(res.data.clientId);
+          setPaymentSettings((prev) => ({ ...prev, paypalEnabled: true }));
+        }
+      } catch {
+        // PayPal not configured — silent
+      }
+    };
+    fetchPaypalId();
+  }, []);
+
+  // Fetch Razorpay key (from SiteSettings or PaymentGatewaySetting)
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const fetchKey = async () => {
+      try {
+        const res = await fetchApi("/payment/razorpay-key", { credentials: "include" });
+        if (res?.success && res?.data?.key) {
+          setRazorpayKey(res.data.key);
+        }
+      } catch (err) {
+        console.error("Error fetching Razorpay key:", err);
+      }
+    };
+    fetchKey();
+  }, [isAuthenticated]);
+
+  // Load and render PayPal buttons when PayPal is selected
+  // (No-op: PayPal now uses redirect flow. Buttons are rendered server-side via hosted checkout.)
+
+  // Handle address selection
+  const handleAddressSelect = (id) => {
+    setSelectedAddressId(id);
+  };
+
+  // Handle payment method selection
+  const handlePaymentMethodSelect = (method) => {
+    setPaymentMethod(method);
+  };
+
+  // Handle address form success
+  const handleAddressFormSuccess = () => {
+    setShowAddressForm(false);
+    fetchAddresses();
+  };
+
+  // Add countdown for redirect
+  useEffect(() => {
+    if (orderCreated && redirectCountdown > 0) {
+      const timer = setTimeout(() => {
+        setRedirectCountdown(redirectCountdown - 1);
+      }, 1000);
+
+      return () => clearTimeout(timer);
+    } else if (orderCreated && redirectCountdown === 0) {
+      router.push(`/account/orders`);
+    }
+  }, [orderCreated, redirectCountdown, router]);
+
+  // Enhanced confetti effect when order is successful
+  useEffect(() => {
+    if (successAnimation) {
+      // Trigger the celebration confetti
+      fireConfetti.celebration();
+
+      // Follow with just one more cannon after 1.5 seconds for lighter effect
+      const timer = setTimeout(() => {
+        setConfettiCannon(true);
+        fireConfetti.sides();
+      }, 1500);
+
+      return () => clearTimeout(timer);
+    }
+  }, [successAnimation]);
+
+  // Update the payment handler with enhanced audio feedback
+  const handleSuccessfulPayment = (
+    paymentResponse = null,
+    orderData = null
+  ) => {
+    // Handle Razorpay payment response
+    if (paymentResponse?.razorpay_payment_id) {
+      setPaymentId(paymentResponse.razorpay_payment_id);
+    }
+
+    // Handle order data (from both cash and razorpay orders)
+    if (orderData?.orderNumber) {
+      setOrderNumber(orderData.orderNumber);
+    }
+
+    // Start success animation
+    setSuccessAnimation(true);
+
+    // Play a single success sound
+    // Don't play both sounds as that might be too much
+    playSuccessSound();
+
+    // Clear cart after successful order
+    clearCart();
+
+    // Show enhanced success toast
+    const orderNum = orderData?.orderNumber || orderNumber || "";
+    toast.success("Order placed successfully!", {
+      duration: 4000,
+      icon: <PartyPopper className="h-5 w-5 text-brand-brown" />,
+      description: orderNum
+        ? `Your order #${orderNum} has been confirmed. Redirecting to orders page...`
+        : "Your order has been confirmed. Redirecting to orders page...",
+    });
+
+    // Set order created after a brief delay to ensure cart is cleared first
+    setTimeout(() => {
+      setOrderCreated(true);
+    }, 100);
+  };
+
+  // Process checkout
+  const handleCheckout = async () => {
+    if (!selectedAddressId) {
+      toast.error("Please select a shipping address");
+      return;
+    }
+
+    // Re-validate payment method is still enabled
+    if (paymentMethod === "CASH" && !paymentSettings.cashEnabled) {
+      toast.error("Cash on Delivery is no longer available. Please choose another payment method.");
+      return;
+    }
+    if (paymentMethod === "RAZORPAY" && !paymentSettings.razorpayEnabled) {
+      toast.error("Online payment is unavailable. Please choose another payment method.");
+      return;
+    }
+    if (paymentMethod === "PAYPAL" && !paypalClientId) {
+      toast.error("PayPal is not available. Please choose another payment method.");
+      return;
+    }
+
+    setProcessing(true);
+    setError("");
+
+    try {
+      // Get checkout amount (whole numbers only)
+      const calculatedAmount = totals.total;
+      const amount = Math.max(Math.round(calculatedAmount), 1);
+
+      // Show warning if original amount was less than 1
+      if (calculatedAmount < 1) {
+        toast.info("Minimum order amount is ₹1. Your total has been adjusted.");
+      }
+
+      if (paymentMethod === "CASH") {
+        // Create Cash on Delivery order
+        toast.loading("Creating your order...", {
+          id: "order-creation",
+          duration: 10000,
+        });
+
+        const orderResponse = await fetchApi("/payment/cash-order", {
+          method: "POST",
+          credentials: "include",
+          body: JSON.stringify({
+            shippingAddressId: selectedAddressId,
+            billingAddressSameAsShipping: true,
+            couponCode: coupon?.code || null,
+            couponId: coupon?.id || null,
+            discountAmount: totals.discount || 0,
+            selectedCourierId: null,
+            selectedShippingCharge: undefined,
+          }),
+        });
+
+        toast.dismiss("order-creation");
+
+        if (!orderResponse.success) {
+          throw new Error(orderResponse.message || "Failed to create order");
+        }
+
+        // Show success for cash order
+        const orderData = {
+          orderNumber: orderResponse.data.orderNumber,
+          orderId: orderResponse.data.orderId,
+          paymentMethod: orderResponse.data.paymentMethod || "CASH",
+        };
+        setOrderNumber(orderResponse.data.orderNumber);
+        setOrderId(orderResponse.data.orderId || "");
+        handleSuccessfulPayment(null, orderData);
+        return;
+      } else if (paymentMethod === "PAYPAL") {
+        // PayPal flow — redirect to PayPal hosted checkout (reliable for all countries)
+        if (!paypalClientId) {
+          toast.error("PayPal is not configured. Please contact support.");
+          setProcessing(false);
+          return;
+        }
+        try {
+          const paypalAmount = Math.max(
+            parseFloat(((totals.subtotal - totals.discount) / paymentSettings.usdExchangeRate).toFixed(2)),
+            0.01
+          );
+          toast.loading("Redirecting to PayPal...", { id: "paypal-redirect" });
+          const createRes = await fetchApi("/payment/paypal/create-order", {
+            method: "POST",
+            credentials: "include",
+            body: JSON.stringify({
+              amount: paypalAmount.toFixed(2),
+              currency: "USD",
+              shippingAddressId: selectedAddressId,
+            }),
+          });
+          toast.dismiss("paypal-redirect");
+          if (!createRes?.success) throw new Error(createRes?.message || "Failed to create PayPal order");
+          const approveLink = createRes.data?.approveLink;
+          if (!approveLink) {
+            throw new Error("PayPal approval link not received. Please try again.");
+          }
+          // Redirect user to PayPal hosted checkout (works in all countries, including India live mode)
+          window.location.href = approveLink;
+        } catch (err) {
+          toast.error(err?.message || "PayPal redirect failed. Please try again.");
+          setProcessing(false);
+        }
+        return;
+      } else if (paymentMethod === "PAYONEER") {
+        // Payoneer — create payment session → redirect to Payoneer hosted page
+        try {
+          const payoneerAmount = Math.max(
+            parseFloat(((totals.subtotal - totals.discount) / paymentSettings.usdExchangeRate).toFixed(2)),
+            0.01
+          );
+          toast.loading("Creating Payoneer payment...", { id: "payoneer-create" });
+          const createRes = await fetchApi("/payment/payoneer/create-payment", {
+            method: "POST",
+            credentials: "include",
+            body: JSON.stringify({
+              amount: payoneerAmount.toFixed(2),
+              currency: "USD",
+              shippingAddressId: selectedAddressId,
+            }),
+          });
+          toast.dismiss("payoneer-create");
+          if (!createRes?.success) throw new Error(createRes?.message || "Payoneer init failed");
+          if (createRes.data.manualInstructions) {
+            // Payoneer not fully configured — show manual instructions
+            toast.info("Please transfer payment via Payoneer to Program ID: " + createRes.data.programId + ". Contact us after transfer.", { duration: 10000 });
+            setProcessing(false);
+          } else if (createRes.data.redirectUrl) {
+            window.location.href = createRes.data.redirectUrl;
+          }
+        } catch (err) {
+          toast.error(err?.message || "Payoneer payment failed");
+          setProcessing(false);
+        }
+        return;
+      } else if (paymentMethod === "RAZORPAY") {
+        // Ensure Razorpay key is available
+        if (!razorpayKey) {
+          // Try to fetch it again
+          try {
+            const keyResponse = await fetchApi("/payment/razorpay-key", {
+              method: "GET",
+              credentials: "include",
+            });
+            if (keyResponse.success && keyResponse.data?.key) {
+              setRazorpayKey(keyResponse.data.key);
+            } else {
+              throw new Error("Razorpay key not available. Please configure payment gateway settings.");
+            }
+          } catch (keyError) {
+            throw new Error("Failed to fetch Razorpay key. Please configure payment gateway settings in admin panel.");
+          }
+        }
+
+        // Show loading toast for order creation
+        toast.loading("Creating your order...", {
+          id: "order-creation",
+          duration: 10000,
+        });
+
+        // Step 1: Create Razorpay order
+        const orderResponse = await fetchApi("/payment/checkout", {
+          method: "POST",
+          credentials: "include",
+          body: JSON.stringify({
+            amount,
+            currency: "INR",
+            paymentGateway: "RAZORPAY",
+            // Include coupon information for proper tracking
+            couponCode: coupon?.code || null,
+            couponId: coupon?.id || null,
+            discountAmount: totals.discount || 0,
+          }),
+        });
+
+        // Dismiss order creation toast
+        toast.dismiss("order-creation");
+
+        if (!orderResponse.success) {
+          throw new Error(orderResponse.message || "Failed to create order");
+        }
+
+        // Show success toast for order creation
+        toast.success("Order created! Opening payment gateway...", {
+          duration: 2000,
+        });
+
+        const razorpayOrder = orderResponse.data;
+        setOrderId(razorpayOrder.id);
+
+        // Step 2: Load Razorpay script with loading indicator
+        toast.loading("Loading payment gateway...", {
+          id: "payment-gateway",
+          duration: 5000,
+        });
+
+        const loaded = await loadScript(
+          "https://checkout.razorpay.com/v1/checkout.js"
+        );
+
+        toast.dismiss("payment-gateway");
+
+        if (!loaded) {
+          throw new Error("Razorpay SDK failed to load");
+        }
+
+        // Get the current razorpayKey (ensure it's available)
+        let currentKey = razorpayKey;
+        if (!currentKey) {
+          try {
+            const keyResponse = await fetchApi("/payment/razorpay-key", {
+              method: "GET",
+              credentials: "include",
+            });
+            if (keyResponse.success && keyResponse.data?.key) {
+              currentKey = keyResponse.data.key;
+              setRazorpayKey(currentKey);
+            }
+          } catch (keyError) {
+            console.error("Failed to fetch Razorpay key:", keyError);
+          }
+        }
+
+        if (!currentKey) {
+          throw new Error("Razorpay key is missing. Please configure payment gateway settings in admin panel.");
+        }
+
+        const options = {
+          key: currentKey,
+          amount: razorpayOrder.amount,
+          currency: razorpayOrder.currency,
+          name: siteName || "Your Store",
+          description: "Order Payment",
+          order_id: razorpayOrder.id,
+          prefill: {
+            name: user?.name || "",
+            email: user?.email || "",
+            contact: user?.phone || "",
+          },
+          handler: async function (response) {
+            // Step 4: Verify payment - Show loading state during verification
+            setProcessing(true);
+
+            // Add a toast to show payment verification is in progress
+            toast.loading("Verifying your payment...", {
+              id: "payment-verification",
+              duration: 10000,
+            });
+
+            try {
+              const verificationResponse = await fetchApi("/payment/verify", {
+                method: "POST",
+                credentials: "include",
+                body: JSON.stringify({
+                  // Send both formats to ensure compatibility
+                  razorpay_order_id: response.razorpay_order_id,
+                  razorpay_payment_id: response.razorpay_payment_id,
+                  razorpay_signature: response.razorpay_signature,
+                  // Also send camelCase versions
+                  razorpayOrderId: response.razorpay_order_id,
+                  razorpayPaymentId: response.razorpay_payment_id,
+                  razorpaySignature: response.razorpay_signature,
+                  // Include shipping and coupon information
+                  shippingAddressId: selectedAddressId,
+                  billingAddressSameAsShipping: true,
+                  // Also pass coupon information again to ensure it's included
+                  couponCode: coupon?.code || null,
+                  couponId: coupon?.id || null,
+                  discountAmount: totals.discount || 0,
+                  notes: "",
+                  selectedCourierId: null,
+                  selectedShippingCharge: undefined,
+                }),
+              });
+
+              // Dismiss the loading toast
+              toast.dismiss("payment-verification");
+
+              if (verificationResponse.success) {
+                // Show success message
+                toast.success("Payment verified successfully! 🎉", {
+                  duration: 3000,
+                });
+
+                setOrderId(verificationResponse.data.orderId);
+                handleSuccessfulPayment(response, verificationResponse.data);
+              } else {
+                throw new Error(
+                  verificationResponse.message || "Payment verification failed"
+                );
+              }
+            } catch (error) {
+              console.error("Payment verification error:", error);
+
+              // Dismiss the loading toast
+              toast.dismiss("payment-verification");
+
+              // If the error is about a previously cancelled order, guide the user
+              if (
+                error.message &&
+                error.message.includes("previously cancelled")
+              ) {
+                setError(
+                  "Your previous order was cancelled. Please refresh the page and try again."
+                );
+                toast.error("Please refresh the page to start a new checkout", {
+                  duration: 6000,
+                  style: {
+                    backgroundColor: "#FEF3C7",
+                    color: "#D97706",
+                    border: "1px solid #FCD34D",
+                  },
+                });
+              } else {
+                setError(error.message || "Payment verification failed");
+                toast.error(
+                  error.message ||
+                  "Payment verification failed. Please try again.",
+                  {
+                    duration: 5000,
+                    style: {
+                      backgroundColor: "#FEE2E2",
+                      color: "#DC2626",
+                      border: "1px solid #FECACA",
+                    },
+                  }
+                );
+              }
+
+              setProcessing(false);
+            }
+          },
+          theme: {
+            color: "#000000",
+          },
+          modal: {
+            ondismiss: function () {
+              // When Razorpay modal is dismissed
+              setProcessing(false);
+            },
+          },
+        };
+
+        const razorpay = new window.Razorpay(options);
+        razorpay.open();
+      } else {
+        // No payment method selected or available
+        toast.error("Please select a payment method");
+        return;
+      }
+    } catch (error) {
+      console.error("Checkout error:", error);
+
+      // Dismiss any pending loading toasts
+      toast.dismiss("order-creation");
+      toast.dismiss("payment-gateway");
+      toast.dismiss("payment-verification");
+
+      if (
+        error.message &&
+        error.message.includes("order was previously cancelled")
+      ) {
+        // Clear local state and guide the user
+        setError(
+          "This order was previously cancelled. Please refresh the page to start a new checkout."
+        );
+        toast.error("Please refresh the page to start a new checkout", {
+          duration: 6000,
+          style: {
+            backgroundColor: "#FEF3C7",
+            color: "#D97706",
+            border: "1px solid #FCD34D",
+          },
+        });
+      } else {
+        setError(error.message || "Checkout failed");
+        toast.error(error.message || "Checkout failed", {
+          duration: 4000,
+          style: {
+            backgroundColor: "#FEE2E2",
+            color: "#DC2626",
+            border: "1px solid #FECACA",
+          },
+        });
+      }
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  if (!isAuthenticated || loadingAddresses) {
+    return (
+      <div className="container mx-auto px-4 py-10">
+        <div className="flex justify-center items-center h-64">
+          <div className="w-12 h-12 border-4 border-brand-brown border-t-transparent rounded-full animate-spin"></div>
+        </div>
+      </div>
+    );
+  }
+
+  // If order created successfully
+  if (orderCreated) {
+    return (
+      <div className="container mx-auto px-4 py-12">
+        <div className="max-w-lg mx-auto bg-white p-8 rounded-lg border shadow-lg relative overflow-hidden">
+          {/* Background pattern for festive feel */}
+          <div className="absolute inset-0 bg-gradient-to-br from-brand-brown/5 to-transparent z-0"></div>
+
+          {/* Celebration animation */}
+          <div className="relative z-10">
+            <div className="relative flex justify-center">
+              <div className="h-36 w-36 bg-brand-brown/10 rounded-full flex items-center justify-center mx-auto mb-6 animate-bounce">
+                <PartyPopper
+                  className={`h-20 w-20 text-brand-brown ${confettiCannon ? "animate-pulse" : ""
+                    }`}
+                />
+              </div>
+
+              {/* Radiating circles animation */}
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="animate-ping absolute h-40 w-40 rounded-full bg-brand-brown opacity-20"></div>
+                <div className="animate-ping absolute h-32 w-32 rounded-full bg-brand-cream0 opacity-10 delay-150"></div>
+                <div className="animate-ping absolute h-24 w-24 rounded-full bg-yellow-500 opacity-10 delay-300"></div>
+              </div>
+            </div>
+
+            <div className="text-center">
+              <h1 className="text-4xl font-bold mb-2 text-gray-800 animate-pulse">
+                Woohoo!
+              </h1>
+
+              <h2 className="text-2xl font-bold mb-2 text-gray-800">
+                Order Confirmed!
+              </h2>
+
+              {orderNumber && (
+                <div className="bg-brand-brown/10 py-2 px-4 rounded-full inline-block mb-3">
+                  <p className="text-lg font-semibold text-brand-brown">
+                    Order #{orderNumber}
+                  </p>
+                </div>
+              )}
+
+              <div className="my-6 flex items-center justify-center bg-brand-cream p-4 rounded-lg">
+                <CheckCircle className="h-8 w-8 text-brand-brown mr-2" />
+                <p className="text-xl text-brand-brown font-medium">
+                  Payment Successful
+                </p>
+              </div>
+
+              <p className="text-gray-600 mb-6 max-w-md mx-auto">
+                Thank you for your purchase! Your order has been successfully
+                placed and you&apos;ll receive an email confirmation shortly.
+              </p>
+
+              <div className="mb-6 bg-blue-50 p-4 rounded-lg border border-blue-100">
+                <div className="flex items-center justify-center space-x-2 mb-3">
+                  <Loader2 className="h-4 w-4 text-blue-500 animate-spin" />
+                  <p className="text-blue-700">
+                    Redirecting to orders page in {redirectCountdown} seconds...
+                  </p>
+                </div>
+                <div className="text-center">
+                  <Link href="/account/orders">
+                    <button className="text-blue-600 hover:text-blue-800 text-sm underline">
+                      Go to orders now →
+                    </button>
+                  </Link>
+                </div>
+              </div>
+
+              <div className="flex justify-center gap-4">
+                <Link href="/account/orders">
+                  <Button className="gap-2">
+                    <ShoppingBag size={16} />
+                    My Orders
+                  </Button>
+                </Link>
+                <Link href="/products">
+                  <Button variant="outline" className="gap-2">
+                    <Gift size={16} />
+                    Continue Shopping
+                  </Button>
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="container mx-auto px-4 py-8 relative">
+      {/* Loading Overlay for Payment Processing */}
+      {processing && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center">
+          <div className="bg-white rounded-2xl p-8 max-w-md mx-4 text-center shadow-2xl">
+            <div className="mb-6">
+              <div className="h-20 w-20 bg-brand-brown/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Loader2 className="h-10 w-10 text-brand-brown animate-spin" />
+              </div>
+              <h3 className="text-xl font-semibold text-gray-800 mb-2">
+                Processing Your Payment
+              </h3>
+              <p className="text-gray-600 text-sm leading-relaxed">
+                Please wait while we securely process your payment. Do not
+                refresh or close this page.
+              </p>
+            </div>
+
+            {/* Progress indicators */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-center space-x-2">
+                <div className="h-2 w-2 bg-brand-brown rounded-full animate-bounce"></div>
+                <div className="h-2 w-2 bg-brand-brown rounded-full animate-bounce delay-100"></div>
+                <div className="h-2 w-2 bg-brand-brown rounded-full animate-bounce delay-200"></div>
+              </div>
+              <p className="text-xs text-gray-500">
+                This may take a few moments...
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <h1 className="text-2xl font-bold mb-6">Checkout</h1>
+
+      {error && (
+        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-md flex items-start">
+          <AlertCircle className="text-red-500 mt-0.5 mr-3 flex-shrink-0" />
+          <div>
+            <p className="text-red-700 font-semibold">Payment Failed</p>
+            <p className="text-red-600">{error}</p>
+          </div>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Main checkout area */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Shipping Addresses */}
+          <div className="bg-white rounded-lg shadow-sm border p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold flex items-center">
+                <MapPin className="h-5 w-5 mr-2 text-brand-brown" />
+                Shipping Address
+              </h2>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-brand-brown"
+                onClick={() => setShowAddressForm(!showAddressForm)}
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                Add New
+              </Button>
+            </div>
+
+            {showAddressForm && (
+              <AddressForm
+                onSuccess={handleAddressFormSuccess}
+                onCancel={() => setShowAddressForm(false)}
+                isInline={true}
+              />
+            )}
+
+            {addresses.length === 0 && !showAddressForm ? (
+              <div className="bg-yellow-50 p-4 rounded-md border border-yellow-200">
+                <span className="text-yellow-700">
+                  You don&apos;t have any saved addresses.{" "}
+                  <button
+                    className="font-medium underline"
+                    onClick={() => setShowAddressForm(true)}
+                  >
+                    Add an address
+                  </button>{" "}
+                  to continue.
+                </span>
+              </div>
+            ) : (
+              <div
+                className={`grid grid-cols-1 md:grid-cols-2 gap-4 ${showAddressForm ? "mt-6" : ""
+                  }`}
+              >
+                {addresses.map((address) => (
+                  <div
+                    key={address.id}
+                    className={`border rounded-md p-4 cursor-pointer transition-all ${selectedAddressId === address.id
+                      ? "border-brand-brown bg-brand-brown/5"
+                      : "hover:border-gray-400"
+                      }`}
+                    onClick={() => handleAddressSelect(address.id)}
+                  >
+                    <div className="flex justify-between items-start mb-2">
+                      <span className="font-medium">{address.name}</span>
+                      {address.isDefault && (
+                        <span className="text-xs bg-brand-brown/10 text-brand-brown px-2 py-0.5 rounded">
+                          Default
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-sm text-gray-600">
+                      <p>{address.street}</p>
+                      <p>
+                        {address.city}, {address.state} {address.postalCode}
+                      </p>
+                      <p>{address.country}</p>
+                      <p className="mt-1">
+                        Phone: {address.phone || "Not provided"}
+                      </p>
+                    </div>
+                    <div className="mt-3 flex items-center">
+                      <input
+                        type="radio"
+                        name="addressSelection"
+                        checked={selectedAddressId === address.id}
+                        onChange={() => handleAddressSelect(address.id)}
+                        className="h-4 w-4 text-brand-brown border-gray-300 focus:ring-brand-brown"
+                      />
+                      <label
+                        htmlFor={`address-${address.id}`}
+                        className="ml-2 text-sm font-medium"
+                      >
+                        Ship to this address
+                      </label>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+
+          {/* Payment Method */}
+          <div className="bg-white rounded-lg shadow-sm border p-6">
+            <h2 className="text-lg font-semibold flex items-center mb-4">
+              <CreditCard className="h-5 w-5 mr-2 text-brand-brown" />
+              Payment Method
+            </h2>
+
+            {!paymentSettings.cashEnabled && !paymentSettings.razorpayEnabled ? (
+              <div className="border rounded-md p-4 bg-yellow-50 border-yellow-200">
+                <p className="text-sm text-yellow-800">
+                  No payment methods are currently available. Please contact support or try again later.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {/* Cash on Delivery Option - Only show if enabled */}
+                {paymentSettings.cashEnabled && (
+                  <div
+                    className={`border rounded-md p-4 transition-all ${paymentMethod === "CASH"
+                      ? "border-brand-brown bg-brand-brown/5 cursor-pointer"
+                      : "hover:border-gray-400 cursor-pointer"
+                      }`}
+                    onClick={() => {
+                      handlePaymentMethodSelect("CASH");
+                    }}
+                  >
+                    <div className="flex items-center">
+                      <input
+                        type="radio"
+                        id="cash"
+                        name="paymentMethod"
+                        checked={paymentMethod === "CASH"}
+                        onChange={() => {
+                          handlePaymentMethodSelect("CASH");
+                        }}
+                        className="h-4 w-4 text-brand-brown border-gray-300 focus:ring-brand-brown"
+                      />
+                      <label
+                        htmlFor="cash"
+                        className="ml-2 flex items-center flex-1"
+                      >
+                        <span className="font-medium">Cash on Delivery (COD)</span>
+                        {paymentMethod === "CASH" && (
+                          <span className="ml-2 text-xs bg-brand-cream text-brand-brown px-2 py-0.5 rounded">
+                            Selected
+                          </span>
+                        )}
+                      </label>
+                      <span className="flex items-center">
+                        <Wallet className="h-4 w-4 text-brand-brown" />
+                      </span>
+                    </div>
+                    <p className="text-sm mt-2 ml-6 text-gray-600">
+                      Pay with cash when your order is delivered
+                      {paymentSettings.codCharge > 0 && (
+                        <span className="block mt-1 text-brand-brown font-medium">
+                          Note: An extra fee of {formatCurrency(paymentSettings.codCharge)} applies for COD orders.
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                )}
+
+                {/* Razorpay — India only */}
+                {paymentSettings.razorpayEnabled && (
+                  <div
+                    className={`border rounded-md p-4 transition-all ${paymentMethod === "RAZORPAY"
+                      ? "border-brand-brown bg-brand-brown/5 cursor-pointer"
+                      : "hover:border-gray-400 cursor-pointer"
+                      }`}
+                    onClick={() => handlePaymentMethodSelect("RAZORPAY")}
+                  >
+                    <div className="flex items-center">
+                      <input
+                        type="radio"
+                        id="razorpay"
+                        name="paymentMethod"
+                        checked={paymentMethod === "RAZORPAY"}
+                        onChange={() => handlePaymentMethodSelect("RAZORPAY")}
+                        className="h-4 w-4 text-brand-brown border-gray-300 focus:ring-brand-brown"
+                      />
+                      <label htmlFor="razorpay" className="ml-2 flex items-center flex-1">
+                        <span className="font-medium">Pay Online (Razorpay)</span>
+                        {paymentMethod === "RAZORPAY" && (
+                          <span className="ml-2 text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded">Selected</span>
+                        )}
+                      </label>
+                      <IndianRupee className="h-4 w-4 text-brand-brown" />
+                    </div>
+                    <p className="text-sm mt-2 ml-6 text-gray-600">
+                      Pay securely with Credit/Debit Card, UPI, NetBanking, etc.
+                    </p>
+                  </div>
+                )}
+
+                {/* PayPal — International */}
+                {paymentSettings.paypalEnabled && paypalClientId && (
+                  <div
+                    className={`border rounded-md p-4 transition-all ${paymentMethod === "PAYPAL"
+                      ? "border-[#0070BA] bg-[#0070BA]/5 cursor-pointer"
+                      : "hover:border-gray-400 cursor-pointer"
+                      }`}
+                    onClick={() => handlePaymentMethodSelect("PAYPAL")}
+                  >
+                    <div className="flex items-center">
+                      <input
+                        type="radio"
+                        id="paypal"
+                        name="paymentMethod"
+                        checked={paymentMethod === "PAYPAL"}
+                        onChange={() => handlePaymentMethodSelect("PAYPAL")}
+                        className="h-4 w-4 border-gray-300"
+                      />
+                      <label htmlFor="paypal" className="ml-2 flex items-center flex-1">
+                        <span className="font-medium text-[#003087]">PayPal</span>
+                        {paymentMethod === "PAYPAL" && (
+                          <span className="ml-2 text-xs bg-[#0070BA]/10 text-[#0070BA] px-2 py-0.5 rounded">Selected</span>
+                        )}
+                      </label>
+                      <span className="text-[#0070BA] font-bold text-sm">PayPal</span>
+                    </div>
+                    <p className="text-sm mt-2 ml-6 text-gray-600">
+                      Pay securely with your PayPal account or credit/debit card internationally.
+                    </p>
+                  </div>
+                )}
+
+                {/* Payoneer — International */}
+                {paymentSettings.payoneerEnabled && (
+                  <div
+                    className={`border rounded-md p-4 transition-all ${paymentMethod === "PAYONEER"
+                      ? "border-orange-500 bg-orange-50 cursor-pointer"
+                      : "hover:border-gray-400 cursor-pointer"
+                      }`}
+                    onClick={() => handlePaymentMethodSelect("PAYONEER")}
+                  >
+                    <div className="flex items-center">
+                      <input
+                        type="radio"
+                        id="payoneer"
+                        name="paymentMethod"
+                        checked={paymentMethod === "PAYONEER"}
+                        onChange={() => handlePaymentMethodSelect("PAYONEER")}
+                        className="h-4 w-4 border-gray-300"
+                      />
+                      <label htmlFor="payoneer" className="ml-2 flex items-center flex-1">
+                        <span className="font-medium text-orange-700">Payoneer</span>
+                        {paymentMethod === "PAYONEER" && (
+                          <span className="ml-2 text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded">Selected</span>
+                        )}
+                      </label>
+                      <span className="text-orange-600 font-bold text-xs">PAYONEER</span>
+                    </div>
+                    <p className="text-sm mt-2 ml-6 text-gray-600">
+                      Pay via Payoneer — ideal for international business payments.
+                    </p>
+                  </div>
+                )}
+
+                {/* International notice */}
+                {!isIndianCustomer && geoDetected && (
+                  <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-md text-xs text-blue-700">
+                    International checkout detected. Showing international payment options.
+                    <button className="underline ml-1" onClick={() => setIsIndianCustomer(true)}>
+                      Switch to India payments
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Order Summary */}
+        <div className="lg:col-span-1">
+          <div className="bg-white rounded-lg shadow-sm border p-6 sticky top-20">
+            <h2 className="text-lg font-semibold mb-4">Order Summary</h2>
+
+            <div className="divide-y">
+              <div className="pb-4">
+                <p className="text-sm font-medium mb-2">
+                  {cart.totalQuantity} Items in Cart
+                </p>
+                <div className="max-h-52 overflow-y-auto space-y-3">
+                  {cart.items?.map((item) => (
+                    <div key={item.id} className="flex items-center gap-3">
+                      <div className="h-10 w-10 bg-gray-100 rounded flex-shrink-0 relative">
+                        {item.product.image && (
+                          <Image
+                            src={getImageUrl(item.product.image)}
+                            alt={item.product.name}
+                            fill
+                            className="object-contain p-1"
+                          />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">
+                          {item.product.name}
+                        </p>
+                        {(item.variant?.attributes?.length > 0 ||
+                          item.variant?.color ||
+                          item.variant?.size) && (
+                            <p className="text-xs text-gray-500 flex items-center gap-1">
+                              {item.variant?.attributes &&
+                                item.variant.attributes.length > 0 ? (
+                                <span>
+                                  {item.variant.attributes.map((attr, idx) => (
+                                    <span key={attr.attributeValueId}>
+                                      {attr.attribute}: {attr.value}
+                                      {idx < item.variant.attributes.length - 1 &&
+                                        " • "}
+                                    </span>
+                                  ))}
+                                </span>
+                              ) : (
+                                <>
+                                  {item.variant?.color && (
+                                    <>
+                                      {item.variant.color?.hexCode && (
+                                        <div
+                                          className="w-3 h-3 rounded-full border"
+                                          style={{
+                                            backgroundColor:
+                                              item.variant.color.hexCode,
+                                          }}
+                                        />
+                                      )}
+                                      <span>
+                                        {item.variant.color?.name ||
+                                          item.variant.color}
+                                      </span>
+                                    </>
+                                  )}
+                                  {item.variant?.color && item.variant?.size && (
+                                    <span> • </span>
+                                  )}
+                                  {item.variant?.size && (
+                                    <span>
+                                      {item.variant.size?.name ||
+                                        item.variant.size}
+                                    </span>
+                                  )}
+                                </>
+                              )}
+                            </p>
+                          )}
+                        <p className="text-xs text-gray-500">
+                          {item.quantity} × {formatCurrency(item.price)}
+                          {item.originalPrice && item.originalPrice !== item.price && (
+                            <span className="line-through text-gray-400 ml-1">
+                              {formatCurrency(item.originalPrice)}
+                            </span>
+                          )}
+                        </p>
+                        {item.priceSource && item.priceSource !== "DEFAULT" && (
+                          <p className="text-xs text-brand-brown font-medium mt-1">
+                            Bulk pricing applied
+                          </p>
+                        )}
+                        {item.moq && item.moq > 1 && (
+                          <p className="text-xs text-blue-600 mt-1">
+                            Min. Order: {item.moq} units
+                          </p>
+                        )}
+                        {item.addons && item.addons.length > 0 && (
+                          <div className="mt-1 space-y-0.5">
+                            {item.addons.map((addon) => (
+                              <div key={addon.id} className="flex items-center gap-1 text-xs text-gray-500">
+                                <AddonSvgIcon icon={addon.addonService?.icon || addon.icon} size={11} className="text-gray-400" />
+                                <span>{addon.addonService?.name || addon.name}</span>
+                                <span className="ml-auto">+{formatCurrency(addon.addonService?.price || addon.price)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <p className="font-medium text-sm">
+                        {formatCurrency(item.subtotal)}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="py-4 space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Subtotal</span>
+                  <span>{formatCurrency(totals.subtotal)}</span>
+                </div>
+
+                {coupon && (
+                  <div className="flex justify-between text-brand-brown">
+                    <span>Discount</span>
+                    <span>-{formatCurrency(totals.discount)}</span>
+                  </div>
+                )}
+
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Shipping</span>
+                  {totals.shipping > 0 ? (
+                    <span className="font-medium">{formatCurrency(totals.shipping)}</span>
+                  ) : (
+                    <span className="text-brand-brown font-medium">FREE</span>
+                  )}
+                </div>
+
+                {/* COD Charge */}
+                {paymentMethod === "CASH" && paymentSettings.codCharge > 0 && (
+                  <div className="flex justify-between text-gray-600">
+                    <span>COD Surcharge</span>
+                    <span className="font-medium">{formatCurrency(paymentSettings.codCharge)}</span>
+                  </div>
+                )}
+
+                {/* Tax removed */}
+
+                {/* Free shipping progress message */}
+                {totals.shipping > 0 && cart.freeShippingThreshold > 0 && (
+                  <div className="mt-3 text-xs text-amber-700 bg-amber-50 p-2 rounded text-center font-medium border border-amber-200">
+                    Add <strong>{formatCurrency(cart.freeShippingThreshold - totals.subtotal)}</strong> more for <span className="text-brand-brown font-bold">FREE shipping!</span>
+                  </div>
+                )}
+
+
+                <div className="pt-4">
+                  <div className="flex justify-between font-bold text-lg">
+                    <span>Total</span>
+                    <span>
+                      {formatCurrency(
+                        totals.total + (paymentMethod === "CASH" ? (paymentSettings.codCharge || 0) : 0)
+                      )}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {paymentMethod === "PAYPAL" ? (
+                <div className="mt-6">
+                  {!selectedAddressId ? (
+                    <div className="text-sm text-center text-amber-700 bg-amber-50 p-4 border border-amber-200 rounded-md font-medium">
+                      Please select a shipping address to pay with PayPal
+                    </div>
+                  ) : (
+                    <button
+                      onClick={handleCheckout}
+                      disabled={processing}
+                      className="w-full bg-[#0070BA] hover:bg-[#003087] text-white font-bold py-3 px-4 rounded-lg flex items-center justify-center gap-2 transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed shadow-md hover:shadow-lg"
+                    >
+                      {processing ? (
+                        <>
+                          <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          <span>Redirecting to PayPal...</span>
+                        </>
+                      ) : (
+                        <>
+                          <svg viewBox="0 0 24 24" className="h-5 w-5 fill-white" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M7.076 21.337H2.47a.641.641 0 0 1-.633-.74L4.944.901C5.026.382 5.474 0 5.998 0h7.46c2.57 0 4.578.543 5.69 1.81 1.01 1.15 1.304 2.42 1.012 4.287-.023.143-.047.288-.077.437-.983 5.05-4.349 6.797-8.647 6.797h-2.19c-.524 0-.968.382-1.05.9l-1.12 7.106zm14.146-14.42a3.35 3.35 0 0 0-.607-.541c-.013.076-.026.175-.041.254-.93 4.778-4.005 7.201-9.138 7.201h-2.19a.563.563 0 0 0-.556.479l-1.187 7.527h-.506l-.24 1.516a.56.56 0 0 0 .554.647h3.882c.46 0 .85-.334.922-.788.06-.26.76-4.852.816-5.09a.932.932 0 0 1 .923-.788h.58c3.76 0 6.705-1.528 7.565-5.946.36-1.847.174-3.388-.777-4.471z"/>
+                          </svg>
+                          <span>Pay with PayPal • USD ${Math.max(parseFloat(((totals.subtotal - totals.discount) / paymentSettings.usdExchangeRate).toFixed(2)), 0.01).toFixed(2)}</span>
+                        </>
+                      )}
+                    </button>
+                  )}
+                  <p className="text-xs text-gray-500 mt-2 text-center">You will be redirected to PayPal to complete your payment securely.</p>
+                </div>
+              ) : (
+                <Button
+                  className={`w-full mt-6 bg-brand-brown hover:bg-brand-dark text-white transition-all duration-200 ${processing ? "shadow-lg" : "hover:shadow-lg"
+                    }`}
+                  size="lg"
+                  onClick={handleCheckout}
+                  disabled={
+                    processing ||
+                    !selectedAddressId ||
+                    !paymentMethod ||
+                    addresses.length === 0
+                  }
+                >
+                  {processing ? (
+                    <span className="flex items-center">
+                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                      <span className="animate-pulse">Processing Payment...</span>
+                    </span>
+                  ) : (
+                    <span className="flex items-center justify-center">
+                      <IndianRupee className="mr-2 h-4 w-4" />
+                      Place Order •{" "}
+                      {formatCurrency(
+                        totals.total + (paymentMethod === "CASH" ? (paymentSettings.codCharge || 0) : 0)
+                      )}
+                    </span>
+                  )}
+                </Button>
+              )}
+
+              <p className="text-xs text-gray-500 mt-4 text-center">
+                By placing your order, you agree to our terms and conditions.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

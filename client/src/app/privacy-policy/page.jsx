@@ -1,0 +1,115 @@
+import { Card, CardContent } from "@/components/ui/card";
+
+export default function PrivacyPolicy() {
+  return (
+    <div className="max-w-4xl mx-auto py-16 px-6 font-jost">
+      <div className="text-center mb-12">
+        <h1 className="text-3xl md:text-4xl tracking-widest uppercase font-normal text-black mb-3">
+          Privacy Policy
+        </h1>
+        <div className="h-0.5 w-16 bg-black mx-auto mb-6"></div>
+        <p className="text-sm text-gray-500 uppercase tracking-widest">
+          Last Updated: June 2026
+        </p>
+      </div>
+
+      <Card className="border border-[#e5e0da] shadow-none bg-white rounded-none">
+        <CardContent className="space-y-8 p-8 md:p-12 text-gray-800 leading-relaxed font-roboto">
+          <p className="text-base font-jost tracking-wide text-gray-600">
+            At FITOVANCE, we value your privacy and are committed to protecting your personal information.
+          </p>
+
+          <hr className="border-[#e5e0da]" />
+
+          {/* Section 1 */}
+          <div className="space-y-3">
+            <h2 className="font-jost text-sm font-bold uppercase tracking-widest text-black">
+              Information We Collect
+            </h2>
+            <p className="text-sm text-gray-600">
+              We may collect information such as your name, email address, phone number, billing and shipping address, payment details (processed securely by third-party payment providers), and website usage data to process orders, provide customer support, improve our services, and comply with legal obligations.
+            </p>
+          </div>
+
+          {/* Section 2 */}
+          <div className="space-y-3">
+            <h2 className="font-jost text-sm font-bold uppercase tracking-widest text-black">
+              Sharing of Information
+            </h2>
+            <p className="text-sm text-gray-600">
+              We do not sell, rent, or trade your personal information to third parties. Information may only be shared with trusted payment processors, shipping partners, service providers, or government authorities where required by law.
+            </p>
+          </div>
+
+          {/* Section 3 */}
+          <div className="space-y-3">
+            <h2 className="font-jost text-sm font-bold uppercase tracking-widest text-black">
+              Cookies &amp; Analytics
+            </h2>
+            <p className="text-sm text-gray-600">
+              Our website may use cookies, analytics tools, and similar technologies to enhance user experience, improve website performance, and support marketing activities.
+            </p>
+          </div>
+
+          {/* Section 4 */}
+          <div className="space-y-3">
+            <h2 className="font-jost text-sm font-bold uppercase tracking-widest text-black">
+              Consent &amp; International Compliance
+            </h2>
+            <p className="text-sm text-gray-600">
+              By using our website, you consent to the collection, processing, storage, and transfer of your information in accordance with applicable privacy laws, including DPDP (India), GDPR, and other relevant data protection regulations.
+            </p>
+          </div>
+
+          {/* Section 5 */}
+          <div className="space-y-3">
+            <h2 className="font-jost text-sm font-bold uppercase tracking-widest text-black">
+              Security
+            </h2>
+            <p className="text-sm text-gray-600">
+              We implement reasonable security measures to protect your information; however, no online system can guarantee absolute security.
+            </p>
+          </div>
+
+          {/* Section 6 */}
+          <div className="space-y-3">
+            <h2 className="font-jost text-sm font-bold uppercase tracking-widest text-black">
+              Your Rights
+            </h2>
+            <p className="text-sm text-gray-600">
+              You may request access, correction, or deletion of your personal information by contacting us.
+            </p>
+          </div>
+
+          {/* Section 7 */}
+          <div className="space-y-3">
+            <h2 className="font-jost text-sm font-bold uppercase tracking-widest text-black">
+              Updates to Policy
+            </h2>
+            <p className="text-sm text-gray-600">
+              We reserve the right to update this Privacy Policy at any time. Continued use of our website constitutes acceptance of any changes.
+            </p>
+          </div>
+
+          <hr className="border-[#e5e0da]" />
+
+          {/* Contact */}
+          <div className="text-center pt-4">
+            <p className="text-sm text-gray-500 font-jost tracking-wide uppercase">
+              Contact Us
+            </p>
+            <p className="text-base font-semibold text-black font-jost mt-1">
+              FITOVANCE
+            </p>
+            <a
+              href="mailto:support@fitovance.com"
+              className="text-base font-semibold text-black hover:underline transition-colors font-jost mt-1 inline-block"
+            >
+              support@fitovance.com
+            </a>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
