@@ -400,7 +400,7 @@ export default function NavigationPage() {
       setColForm({ title: col.title, order: String(col.order), categoryId: col.categoryId || "" });
     } else {
       setEditingCol(null);
-      setColForm({ title: "", order: String(col?.links?.length || 0), categoryId: "" });
+      setColForm({ title: "", order: String(navItem.columns?.length || 0), categoryId: "" });
     }
     setIsColDialogOpen(true);
   };
