@@ -121,11 +121,7 @@ export function Footer() {
   ];
 
   const socials = [
-    { icon: <Twitter size={14} />, href: "https://twitter.com/fitovance", label: "Twitter" },
-    { icon: <Facebook size={14} />, href: "https://www.facebook.com/fitovance", label: "Facebook" },
-    { icon: <Linkedin size={14} />, href: "https://linkedin.com/company/fitovance", label: "LinkedIn" },
-    { icon: <Instagram size={14} />, href: "https://www.instagram.com/fitovance", label: "Instagram" },
-    { icon: <Youtube size={14} />, href: "https://youtube.com/@fitovance", label: "YouTube" },
+    { icon: <Instagram size={14} />, href: "https://www.instagram.com/fitovancemart?igsh=eXFmdDY3cWQ5anc5&utm_source=qr", label: "Instagram" },
   ];
 
   return (
