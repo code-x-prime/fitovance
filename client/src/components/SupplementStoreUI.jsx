@@ -19,7 +19,7 @@ const SupplementStoreUI = () => {
           />
           {/* Desktop image */}
           <img
-            src="/collection-Banner.png"
+            src="/collection-banner.png"
             alt="Collection Banner"
             className="hidden md:block w-full object-cover aspect-[16/6] transition-transform duration-700 group-hover:scale-105"
           />
