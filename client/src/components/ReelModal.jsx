@@ -181,7 +181,9 @@ export default function ReelModal({ reel, onClose, onNext, onPrev, hasNext }) {
           {reel.product?.slug ? (
             <Link
               href={productUrl}
-              onClick={onClose}
+              onClick={() => {
+                setTimeout(onClose, 100);
+              }}
               className="bg-white p-3 flex items-center gap-3 shadow-2xl cursor-pointer hover:bg-gray-50 transition-colors rounded-lg flex w-full"
             >
               {reel.product?.imageUrl && (
