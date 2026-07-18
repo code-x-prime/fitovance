@@ -23,7 +23,7 @@ import {
   Sun,
   Image as ImageIcon,
   Zap,
-  LayoutGrid,
+  // LayoutGrid,
   Globe,
   Cloud,
   Layers,
@@ -423,16 +423,16 @@ export default function DashboardLayout() {
                     icon: <Plus className="h-3 w-3" />,
                     hasPermission: hasPermissionFor(admin, Resource.PRODUCTS, Action.READ),
                   },
-                  {
-                    href: "/product-sections",
-                    title: t("nav.product_sections"),
-                    icon: <LayoutGrid className="h-3 w-3" />,
-                    hasPermission: hasPermissionFor(
-                      admin,
-                      Resource.PRODUCTS,
-                      Action.UPDATE
-                    ),
-                  },
+                  // {
+                  //   href: "/product-sections",
+                  //   title: t("nav.product_sections"),
+                  //   icon: <LayoutGrid className="h-3 w-3" />,
+                  //   hasPermission: hasPermissionFor(
+                  //     admin,
+                  //     Resource.PRODUCTS,
+                  //     Action.UPDATE
+                  //   ),
+                  // },
                   {
                     href: "/banners",
                     title: t("nav.banners"),
@@ -443,16 +443,16 @@ export default function DashboardLayout() {
                       Action.READ
                     ),
                   },
-                  {
-                    href: "/flash-sales",
-                    title: t("nav.flash_sales"),
-                    icon: <Zap className="h-3 w-3" />,
-                    hasPermission: hasPermissionFor(
-                      admin,
-                      Resource.PRODUCTS,
-                      Action.READ
-                    ),
-                  },
+                  // {
+                  //   href: "/flash-sales",
+                  //   title: t("nav.flash_sales"),
+                  //   icon: <Zap className="h-3 w-3" />,
+                  //   hasPermission: hasPermissionFor(
+                  //     admin,
+                  //     Resource.PRODUCTS,
+                  //     Action.READ
+                  //   ),
+                  // },
                 ]}
               />
 
@@ -520,24 +520,24 @@ export default function DashboardLayout() {
                       Action.READ
                     ),
                   },
-                  {
-                    href: "/partner",
-                    title: t("nav.partners"),
-                    icon: <Users className="h-3 w-3" />,
-                    hasPermission:
-                      admin?.role === "SUPER_ADMIN" ||
-                      hasPermissionFor(admin, Resource.USERS, Action.READ),
-                  },
-                  {
-                    href: "/referrals",
-                    title: t("nav.referrals"),
-                    icon: <Users className="h-3 w-3" />,
-                    hasPermission: hasPermissionFor(
-                      admin,
-                      Resource.USERS,
-                      Action.READ
-                    ),
-                  },
+                  // {
+                  //   href: "/partner",
+                  //   title: t("nav.partners"),
+                  //   icon: <Users className="h-3 w-3" />,
+                  //   hasPermission:
+                  //     admin?.role === "SUPER_ADMIN" ||
+                  //     hasPermissionFor(admin, Resource.USERS, Action.READ),
+                  // },
+                  // {
+                  //   href: "/referrals",
+                  //   title: t("nav.referrals"),
+                  //   icon: <Users className="h-3 w-3" />,
+                  //   hasPermission: hasPermissionFor(
+                  //     admin,
+                  //     Resource.USERS,
+                  //     Action.READ
+                  //   ),
+                  // },
                 ]}
               />
 
@@ -795,16 +795,16 @@ export default function DashboardLayout() {
                     icon: <Plus className="h-3 w-3" />,
                     hasPermission: hasPermissionFor(admin, Resource.PRODUCTS, Action.READ),
                   },
-                  {
-                    href: "/product-sections",
-                    title: t("nav.product_sections"),
-                    icon: <LayoutGrid className="h-3 w-3" />,
-                    hasPermission: hasPermissionFor(
-                      admin,
-                      Resource.PRODUCTS,
-                      Action.UPDATE
-                    ),
-                  },
+                  // {
+                  //   href: "/product-sections",
+                  //   title: t("nav.product_sections"),
+                  //   icon: <LayoutGrid className="h-3 w-3" />,
+                  //   hasPermission: hasPermissionFor(
+                  //     admin,
+                  //     Resource.PRODUCTS,
+                  //     Action.UPDATE
+                  //   ),
+                  // },
                   {
                     href: "/banners",
                     title: t("nav.banners"),
@@ -845,16 +845,16 @@ export default function DashboardLayout() {
                       Action.READ
                     ),
                   },
-                  {
-                    href: "/flash-sales",
-                    title: t("nav.flash_sales"),
-                    icon: <Zap className="h-3 w-3" />,
-                    hasPermission: hasPermissionFor(
-                      admin,
-                      Resource.PRODUCTS,
-                      Action.READ
-                    ),
-                  },
+                  // {
+                  //   href: "/flash-sales",
+                  //   title: t("nav.flash_sales"),
+                  //   icon: <Zap className="h-3 w-3" />,
+                  //   hasPermission: hasPermissionFor(
+                  //     admin,
+                  //     Resource.PRODUCTS,
+                  //     Action.READ
+                  //   ),
+                  // },
                 ]}
               />
 
@@ -896,24 +896,24 @@ export default function DashboardLayout() {
                       Action.READ
                     ),
                   },
-                  {
-                    href: "/partner",
-                    title: t("nav.partners"),
-                    icon: <Users className="h-3 w-3" />,
-                    hasPermission:
-                      admin?.role === "SUPER_ADMIN" ||
-                      hasPermissionFor(admin, Resource.USERS, Action.READ),
-                  },
-                  {
-                    href: "/referrals",
-                    title: t("nav.referrals"),
-                    icon: <Users className="h-3 w-3" />,
-                    hasPermission: hasPermissionFor(
-                      admin,
-                      Resource.USERS,
-                      Action.READ
-                    ),
-                  },
+                  // {
+                  //   href: "/partner",
+                  //   title: t("nav.partners"),
+                  //   icon: <Users className="h-3 w-3" />,
+                  //   hasPermission:
+                  //     admin?.role === "SUPER_ADMIN" ||
+                  //     hasPermissionFor(admin, Resource.USERS, Action.READ),
+                  // },
+                  // {
+                  //   href: "/referrals",
+                  //   title: t("nav.referrals"),
+                  //   icon: <Users className="h-3 w-3" />,
+                  //   hasPermission: hasPermissionFor(
+                  //     admin,
+                  //     Resource.USERS,
+                  //     Action.READ
+                  //   ),
+                  // },
                 ]}
               />
 

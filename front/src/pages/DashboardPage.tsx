@@ -26,9 +26,7 @@ import {
   ArrowUpRight,
   BarChart3,
   Calendar,
-  Star,
   Image as ImageIcon,
-  Zap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -334,22 +332,8 @@ export default function DashboardPage() {
           </p>
         </CardHeader>
         <CardContent className="px-6 pb-6">
-          <div className="grid gap-4 md:grid-cols-4">
-            <Button
-              variant="outline"
-              className="h-auto p-4 border-border hover:bg-muted text-left"
-              asChild
-            >
-              <Link to="/product-sections" className="flex items-center gap-3">
-                <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-primary/10">
-                  <Star className="h-5 w-5 text-primary" />
-                </div>
-                <div>
-                  <div className="font-semibold text-foreground">{t("dashboard.quick_actions.product_sections")}</div>
-                  <div className="text-sm text-muted-foreground">{t("dashboard.quick_actions.product_sections_desc")}</div>
-                </div>
-              </Link>
-            </Button>
+          <div className="grid gap-4 md:grid-cols-2">
+
             <Button
               variant="outline"
               className="h-auto p-4 border-border hover:bg-muted text-left"
@@ -365,21 +349,7 @@ export default function DashboardPage() {
                 </div>
               </Link>
             </Button>
-            <Button
-              variant="outline"
-              className="h-auto p-4 border-border hover:bg-muted text-left"
-              asChild
-            >
-              <Link to="/flash-sales" className="flex items-center gap-3">
-                <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-primary/10">
-                  <Zap className="h-5 w-5 text-primary" />
-                </div>
-                <div>
-                  <div className="font-semibold text-foreground">{t("dashboard.quick_actions.flash_sales")}</div>
-                  <div className="text-sm text-muted-foreground">{t("dashboard.quick_actions.flash_sales_desc")}</div>
-                </div>
-              </Link>
-            </Button>
+
             <Button
               variant="outline"
               className="h-auto p-4 border-border hover:bg-muted text-left"
