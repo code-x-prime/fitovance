@@ -276,7 +276,7 @@ export function Footer() {
                   <img
                     src={p.src}
                     alt={p.name}
-                    className="h-4 w-auto object-contain opacity-70 hover:opacity-100 transition-opacity duration-200"
+                    className="h-4 w-auto object-contain  transition-opacity duration-200"
                   />
                 </div>
               ))}
