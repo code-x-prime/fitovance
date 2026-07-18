@@ -122,6 +122,22 @@ export function ProductForm({
   const { theme } = useTheme();
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState("general");
+  const TABS_ORDER = ["general", "media", "highlights", "overview", "detailed", "shipping", "seo", "addons"];
+
+  const handleNextTab = () => {
+    const currentIndex = TABS_ORDER.indexOf(activeTab);
+    if (currentIndex < TABS_ORDER.length - 1) {
+      setActiveTab(TABS_ORDER[currentIndex + 1]);
+    }
+  };
+
+  const handlePrevTab = () => {
+    const currentIndex = TABS_ORDER.indexOf(activeTab);
+    if (currentIndex > 0) {
+      setActiveTab(TABS_ORDER[currentIndex - 1]);
+    }
+  };
   const [formLoading, setFormLoading] = useState(mode === "edit");
   const [attributesList, setAttributesList] = useState<any[]>([]);
   const [attributeValuesMap, setAttributeValuesMap] = useState<
@@ -2020,7 +2036,7 @@ export function ProductForm({
 
       <Card className="overflow-hidden bg-[var(--bg-card)] border-[var(--border-color)]">
         <form onSubmit={handleSubmit} className="p-6">
-          <Tabs defaultValue="general" className="w-full">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="grid w-full grid-cols-8 h-auto p-1 bg-[var(--bg-secondary)] border border-[var(--border-color)] mb-6">
               <TabsTrigger value="general" className="text-xs py-2">General</TabsTrigger>
               <TabsTrigger value="media" className="text-xs py-2">Media</TabsTrigger>
@@ -2570,6 +2586,17 @@ export function ProductForm({
                         return (
                           <label
                             key={`empty-slot-${i}`}
+                            onDragOver={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                            }}
+                            onDrop={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                                handleSlotFileChange(i, e.dataTransfer.files[0]);
+                              }
+                            }}
                             className="relative flex flex-col items-center justify-center border-2 border-dashed border-[var(--border-color)] hover:border-primary/50 hover:bg-[var(--bg-secondary)] rounded-lg cursor-pointer transition-all aspect-square bg-[var(--bg-card)] text-center p-4 group"
                           >
                             <input
@@ -2627,6 +2654,17 @@ export function ProductForm({
                       </div>
                     ) : (
                       <label
+                        onDragOver={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                        }}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                            handleVideoFileChange(e.dataTransfer.files[0]);
+                          }
+                        }}
                         className="relative flex flex-col items-center justify-center border-2 border-dashed border-[var(--border-color)] hover:border-primary/50 hover:bg-[var(--bg-secondary)] rounded-lg cursor-pointer transition-all aspect-square bg-[var(--bg-card)] text-center p-4 group"
                       >
                         <input
@@ -3451,26 +3489,46 @@ export function ProductForm({
           </Tabs>
 
           {/* Submit Buttons */}
-          <div className="flex justify-end gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => navigate("/products")}
-            >
-              {t("common.cancel")}
-            </Button>
-            <Button type="submit" disabled={isLoading}>
-              {isLoading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  {mode === "create" ? t("common.creating") : t("common.updating")}
-                </>
-              ) : mode === "create" ? (
-                t("products.form.add_product_button")
-              ) : (
-                t("products.form.update_product_button")
-              )}
-            </Button>
+          <div className="flex justify-end gap-2 mt-6 pt-4 border-t border-[var(--border-color)]">
+            {activeTab === "general" ? (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => navigate("/products")}
+              >
+                {t("common.cancel")}
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handlePrevTab}
+              >
+                Back
+              </Button>
+            )}
+
+            {activeTab !== "addons" ? (
+              <Button
+                type="button"
+                onClick={handleNextTab}
+              >
+                Next
+              </Button>
+            ) : (
+              <Button type="submit" disabled={isLoading}>
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    {mode === "create" ? t("common.creating") : t("common.updating")}
+                  </>
+                ) : mode === "create" ? (
+                  t("products.form.add_product_button")
+                ) : (
+                  t("products.form.update_product_button")
+                )}
+              </Button>
+            )}
           </div>
         </form>
 
